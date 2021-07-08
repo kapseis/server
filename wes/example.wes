@@ -1,0 +1,25 @@
+message Identity_User {
+	String name @1;
+}
+
+message Identity_CreateUserRequest {
+	Identity_User user @1;
+}
+
+message Identity_Error {
+	String desc @1;
+}
+
+response Identity_GenericResponses {
+	Identity_Error internal;
+}
+
+response Identity_CreateUserResponse {
+	// > @127 is not allowed
+	Identity_GenericResponses @0;
+	// 1xxx_xxxx (where xxx_xxxx is the status code)
+	Identity_User ok;
+}
+
+rpc Identity_CreateUserResponse identity_create_user(Identity_CreateUserRequest) @0x94BE_0166_BBED_2DE0;
+
