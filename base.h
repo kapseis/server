@@ -214,18 +214,18 @@ function u16 swap_byte_order_u16(u16 x);
 
 #define SwapByteOrder(x) _Generic((x), u64: swap_byte_order_u64, u32: swap_byte_order_u32, u16: swap_byte_order_u16)(x)
 
-#define SystemToBO(bo, x) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x))
-#define BOToSystem(bo, x) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x))
-#define SystemToLE(x) SystemToBO(ByteOrder_LittleEndian)
-#define SystemToBE(x) SystemToBO(ByteOrder_BigEndian)
-#define LEToSystem(x) BOToSystem(ByteOrder_LittleEndian)
-#define BEToSystem(x) BOToSystem(ByteOrder_BigEndian)
+#define SystemToBo(bo, x) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x))
+#define BoToSystem(bo, x) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x))
+#define SystemToLe(x) SystemToBo(ByteOrder_LittleEndian)
+#define SystemToBe(x) SystemToBo(ByteOrder_BigEndian)
+#define LeToSystem(x) BoToSystem(ByteOrder_LittleEndian)
+#define BeToSystem(x) BoToSystem(ByteOrder_BigEndian)
 
 //----------- Strings -----------
 
 typedef struct {
-  u8    *buf;
-  usize  len;
+  const u8 *buf;
+  usize     len;
 } String;
 
 typedef struct StringList {
@@ -235,7 +235,7 @@ typedef struct StringList {
 
 #define Str(str) ((String){ .buf = (str), .len = sizeof(str) - 1 })
 
-function String string_from_raw(u8 *buf, usize len);
+function String string_from_raw(const u8 *buf, usize len);
 function void   string_destroy(Mem_Base *mb, String str);
 
 function usize cstring_length(const char *str);

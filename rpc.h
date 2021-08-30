@@ -21,6 +21,28 @@
 #include <mbedtls/debug.h>
 #include <mbedtls/ssl_cache.h>
 
+#define DefSlice(t) struct Glue(Slice_, t) { usize len; usize cap; Mem_Base *mb; t *items; }
+#define Slice(t) struct Glue(Slice_, t)
+#define SliceNew(t, mb) (Slice(t)){ .len = 0, .cap = 0, .mb = mb, .items = NULL }
+#define $(s, i) ((i >= s.len) ? (s.items = Unreachable("index out of bounds")) : &s.items[i])
+#define SliceAppend(sp, v) do {                                                                  \
+    if ((sp)->len + 1 > (sp)->cap)                                                               \
+      slice_grow(&(sp)->len, &(sp)->cap, (sp)->mb, (void **)&(sp)->items, sizeof(*(sp)->items)); \
+    (sp)->items[(sp)->len++] = v;                                                                \
+  } while (false)
+#define SliceLen(s) s.len
+
+function void
+slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usize item_size) {
+  void *new_items = mem_reserve(mb, item_size * *cap * 2);
+  mem_commit(mb, new_items, item_size * *cap * 2);
+  memmove(new_items, *items, item_size * *len);
+  mem_decommit(mb, *items, item_size * *cap);
+  mem_release(mb, *items, item_size * *cap);
+  *items = new_items;
+  *cap *= 2;
+}
+
 struct RpcServer;
 
 typedef struct RpcResponse {
@@ -28,35 +50,15 @@ typedef struct RpcResponse {
   u8 *data;
 } RpcResponse;
 
-typedef RpcResponse RpcHandlerFunc(struct RpcServer *srv, u64 uid, const u8 *data);
+DefSlice(u8);
+typedef RpcResponse RpcHandlerFunc(struct RpcServer *srv, Slice(u8) data, void *ctx);
 
 typedef struct RpcHandler {
+  u64 uid;
   RpcHandlerFunc *f;
   void *ctx;
 } RpcHandler;
-
-typedef struct SliceHeader {
-  usize len;
-  usize cap;
-  Mem_Base *mb;
-} SliceHeader;
-
-#define Slice(t) struct { SliceHeader header; t *items; }
-#define SliceNew(t, mb) (Slice(t)){ .header = { .len = 0, .cap = 0, .mb = mb }, .items = NULL }
-#define $(s, i) ((i >= s.header.len) ? (s.items = Unreachable("index out of bounds")) : &s.items[i])
-#define SliceAppend(sp, v) do {                                                \
-    SliceHeader *h = &(sp)->header;                                            \
-    if (h->len + 1 > h->cap) {                                                 \
-      void *new_items = mem_reserve(h->mb, sizeof(*(sp)->items) * h->cap * 2); \
-      mem_commit(h->mb, new_items, sizeof(*(sp)->items) * h->cap * 2);         \
-      memmove(new_items, (sp)->items, sizeof(*(sp)->items) * h->len);          \
-      mem_decommit(h->mb, (sp)->items, sizeof(*(sp)->items) * h->cap);         \
-      mem_release(h->mb, (sp)->items, sizeof(*(sp)->items) * h->cap);          \
-      (sp)->items = new_items;                                                 \
-      h->cap *= 2;                                                             \
-    }                                                                          \
-    (sp)->items[h->len++] = v;                                                 \
-  } while (false);
+DefSlice(RpcHandler);
 
 typedef struct RpcServer {
   mbedtls_x509_crt          cert;
@@ -71,12 +73,12 @@ typedef struct RpcServer {
 } RpcServer;
 
 typedef struct RpcClient {
-  mbedtls_net_context   client_fd;
-  RpcServer            *server;
+  mbedtls_net_context  client_fd;
+  RpcServer           *server;
 } RpcClient;
 
 function int init_rpc_server(RpcServer *srv);
 function int run_rpc_server(RpcServer *srv);
 
-function RpcHandler
-rpc_handler_new(RpcHandlerFunc *f, void *ctx);
+function RpcHandler rpc_handler_new(u64 uid, RpcHandlerFunc *f, void *ctx);
+function void       rpc_server_reg_handler(RpcServer *srv, RpcHandler hdl);

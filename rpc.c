@@ -128,13 +128,22 @@ reset:
   return 0;
 }
 
-function s32
-rpc_server_handle(RpcServer *srv, RpcHandler hdl) {
+function u64
+rpc_server_handle(RpcServer *srv, u64 uid, Slice(u8) data) {
+  for (usize i = 0; i < SliceLen(srv->handlers); i++) {
+    RpcHandler hdlr = srv->handlers.items[i];
+    if (hdlr.uid == uid) hdlr.f(srv, data, hdlr.ctx);
+  }
+}
+
+function void
+rpc_server_reg_handler(RpcServer *srv, RpcHandler hdl) {
   SliceAppend(&srv->handlers, hdl);
+  rpc_server_handle(srv, 1293408, (Slice(u8)){0});
 }
 
 function RpcHandler
-rpc_handler_new(RpcHandlerFunc *f, void *ctx) {
-  return (RpcHandler){ .f = f, .ctx = ctx };
+rpc_handler_new(u64 uid, RpcHandlerFunc *f, void *ctx) {
+  return (RpcHandler){ .uid = uid, .f = f, .ctx = ctx };
 }
 

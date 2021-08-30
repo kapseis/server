@@ -140,7 +140,7 @@ string_to_c(Mem_Base *mb, String s) {
 }
 
 function String
-string_from_raw(u8 *buf, usize len) {
+string_from_raw(const u8 *buf, usize len) {
   return (String){ .buf = buf, .len = len };
 }
 
@@ -278,7 +278,7 @@ utf16_next_codepoint(Utf16CodepointIterator *it, Utf16String s, u8 *len) {
     return 0;
   }
 
-  u16 start = BOToSystem(s.bo, s.buf[it->i++]);
+  u16 start = BoToSystem(s.bo, s.buf[it->i++]);
   if (start < 0xd800 || start > 0xdfff) {
     SetCodepointLen(1);
     return (rune)start;
@@ -290,7 +290,7 @@ utf16_next_codepoint(Utf16CodepointIterator *it, Utf16String s, u8 *len) {
   if (Unlikely((start & 0xd800) != 0xd800)) return INVALID_RUNE;
   if (Unlikely(s.len - it->i == 0)) return INVALID_RUNE;
 
-  u16 second = BOToSystem(s.bo, s.buf[it->i++]);
+  u16 second = BoToSystem(s.bo, s.buf[it->i++]);
   if (Unlikely((second & 0xdc00) != 0xdc00)) return INVALID_RUNE;
 
   SetCodepointLen(2);
@@ -335,12 +335,12 @@ utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo) {
 
   if (codepoint >= 0x10000) {
     codepoint -= 0x10000;
-    s[0] /* high */ = SystemToBO(bo, 0xd800 + (u32)((codepoint >> 10) & 0x3ff));
-    s[1] /* low  */ = SystemToBO(bo, 0xdc00 + (u32)( codepoint        & 0x3ff));
+    s[0] /* high */ = SystemToBo(bo, 0xd800 + (u32)((codepoint >> 10) & 0x3ff));
+    s[1] /* low  */ = SystemToBo(bo, 0xdc00 + (u32)( codepoint        & 0x3ff));
     return 2;
   }
 
-  *s = SystemToBO(bo, (u16)codepoint);
+  *s = SystemToBo(bo, (u16)codepoint);
   return 1;
 }
 
@@ -391,7 +391,7 @@ utf16_to_utf8(Mem_Base *mb, Utf16String s) {
 function void
 string_destroy(Mem_Base *mb, String s) {
   // TODO(rutgerbrf): what if the user would prefer using mem_decommit?
-  mem_release(mb, s.buf, s.len);
+  mem_release(mb, (void *)s.buf, s.len);
 }
 
 function void
