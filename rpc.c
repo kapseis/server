@@ -147,3 +147,13 @@ rpc_handler_new(u64 uid, RpcHandlerFunc *f, void *ctx) {
   return (RpcHandler){ .uid = uid, .f = f, .ctx = ctx };
 }
 
+function void
+slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usize item_size) {
+  void *new_items = mem_reserve(mb, item_size * *cap * 2);
+  mem_commit(mb, new_items, item_size * *cap * 2);
+  memmove(new_items, *items, item_size * *len);
+  mem_decommit(mb, *items, item_size * *cap);
+  mem_release(mb, *items, item_size * *cap);
+  *items = new_items;
+  *cap *= 2;
+}
