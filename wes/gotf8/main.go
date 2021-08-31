@@ -27,7 +27,7 @@ func main() {
 		}
 		i++
 		r1, r2 := utf16.EncodeRune(r)
-		if r1 == 0xfffd && r2 == 0xfffd {
+		if r1 == 0xFFFD && r2 == 0xFFFD {
 			binary.Write(os.Stdout, binary.BigEndian, uint16(r))
 		} else {
 			binary.Write(os.Stdout, binary.BigEndian, uint16(r1))

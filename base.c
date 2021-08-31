@@ -31,31 +31,31 @@ swap_byte_order_u16(u16 x) {
 #if !NATIVE_SWAP_64
 function u64
 swap_byte_order_u64(u64 x) {
-  return ((x >> 56) & 0x00000000000000ff)
-       | ((x >> 40) & 0x000000000000ff00)
-       | ((x >> 24) & 0x0000000000ff0000)
-       | ((x >>  8) & 0x00000000ff000000)
-       | ((x <<  8) & 0x000000ff00000000)
-       | ((x << 24) & 0x0000ff0000000000)
-       | ((x << 40) & 0x00ff000000000000)
-       | ((x << 56) & 0xff00000000000000);
+  return ((x >> 56) & 0x00000000000000FF)
+       | ((x >> 40) & 0x000000000000FF00)
+       | ((x >> 24) & 0x0000000000FF0000)
+       | ((x >>  8) & 0x00000000FF000000)
+       | ((x <<  8) & 0x000000FF00000000)
+       | ((x << 24) & 0x0000FF0000000000)
+       | ((x << 40) & 0x00FF000000000000)
+       | ((x << 56) & 0xFF00000000000000);
 }
 #endif
 
 #if !NATIVE_SWAP_32
 function u32
 swap_byte_order_u32(u32 x) {
-  return ((x >> 24) & 0x000000ff)
-       | ((x >>  8) & 0x0000ff00)
-       | ((x <<  8) & 0x00ff0000)
-       | ((x << 24) & 0xff000000);
+  return ((x >> 24) & 0x000000FF)
+       | ((x >>  8) & 0x0000FF00)
+       | ((x <<  8) & 0x00FF0000)
+       | ((x << 24) & 0xFF000000);
 }
 #endif
 
 #if !NATIVE_SWAP_16
 function u16
 swap_byte_order_u16(u16 x) {
-  return ((x >> 8) & 0x00ff) | ((x << 8) & 0xff00);
+  return ((x >> 8) & 0x00FF) | ((x << 8) & 0xFF00);
 }
 #endif
 
@@ -197,42 +197,42 @@ utf8_next_codepoint(String s, u8 *len) {
     // An ASCII codepoint.
     *len = 1;
     return (rune)start;
-  } else if ((start & 0xe0) == 0xc0) { // start & 0b1110_0000 == 0b1100_0000
+  } else if ((start & 0xE0) == 0xC0) { // start & 0b1110_0000 == 0b1100_0000
     // One byte follows
     AssertMinLength(2);
     u8 second = s.buf[1];
-    u8 second_data = second & 0x7f;
+    u8 second_data = second & 0x7F;
     if (Unlikely(second_data == second)) return INVALID_RUNE;
     *len = 2;
     // ((start & 0b0001_1111) << 6) | (second & 0b0011_1111)
-    return ((u32)(start & 0x1f) << 6) + (u32)(second & 0x3f);
-  } else if ((start & 0xf0) == 0xe0) { // start & 0b1111_0000 == 0b1110_0000
+    return ((u32)(start & 0x1F) << 6) + (u32)(second & 0x3F);
+  } else if ((start & 0xF0) == 0xE0) { // start & 0b1111_0000 == 0b1110_0000
     // Two bytes follow
     AssertMinLength(3);
     u8 second = s.buf[1];
-    u8 second_data = second & 0x7f;
+    u8 second_data = second & 0x7F;
     if (Unlikely(second_data == second)) return INVALID_RUNE;
     u8 third = s.buf[2];
-    u8 third_data = third & 0x7f;
+    u8 third_data = third & 0x7F;
     if (Unlikely(third_data == third)) return INVALID_RUNE;
     //   ((start  & 0b0000_1111) << 12)
     // + ((second & 0b0011_1111) <<  6)
     // +  (third  & 0b0011_1111)
     *len = 3;
-    return ((u32)(start  & 0x0f) << 12)
-         + ((u32)(second & 0x3f) <<  6)
-         +  (u32)(third  & 0x3f);
-  } else if ((start & 0xf8) == 0xf0) { // start & 0b1111_1000 == 0b1111_0000
+    return ((u32)(start  & 0x0F) << 12)
+         + ((u32)(second & 0x3F) <<  6)
+         +  (u32)(third  & 0x3F);
+  } else if ((start & 0xF8) == 0xF0) { // start & 0b1111_1000 == 0b1111_0000
     // Three bytes follow
     AssertMinLength(4);
     u8 second = s.buf[1];
-    u8 second_data = second & 0x7f;
+    u8 second_data = second & 0x7F;
     if (Unlikely(second_data == second)) return INVALID_RUNE;
     u8 third = s.buf[2];
-    u8 third_data = third & 0x7f;
+    u8 third_data = third & 0x7F;
     if (Unlikely(third_data == third)) return INVALID_RUNE;
     u8 fourth = s.buf[3];
-    u8 fourth_data = fourth & 0x7f;
+    u8 fourth_data = fourth & 0x7F;
     if (Unlikely(fourth_data == fourth)) return INVALID_RUNE;
     //   ((start  & 0b0000_0111) << 18)
     // + ((second & 0b0011_1111) << 12)
@@ -240,9 +240,9 @@ utf8_next_codepoint(String s, u8 *len) {
     // +  (fourth & 0b0011_1111)
     *len = 4;
     return ((u32)(start  & 0x07) << 18)
-         + ((u32)(second & 0x3f) << 12)
-         + ((u32)(third  & 0x3f) <<  6)
-         +  (u32)(fourth & 0x3f);
+         + ((u32)(second & 0x3F) << 12)
+         + ((u32)(third  & 0x3F) <<  6)
+         +  (u32)(fourth & 0x3F);
   }
 
   return INVALID_RUNE;
@@ -275,7 +275,7 @@ utf16_next_codepoint(Utf16String s, u8 *len) {
   }
 
   u16 start = BoToSystem(s.bo, s.buf[0]);
-  if (start < 0xd800 || start > 0xdfff) {
+  if (start < 0xD800 || start > 0xDFFF) {
     *len = 1;
     return (rune)start;
   }
@@ -283,14 +283,14 @@ utf16_next_codepoint(Utf16String s, u8 *len) {
   // NOTE(rutgerbrf):
   //  With regard to https://en.wikipedia.org/wiki/UTF-16#U.2BD800_to_U.2BDFFF,
   //  we may not actually these checks to result in an error.
-  if (Unlikely((start & 0xd800) != 0xd800)) return INVALID_RUNE;
+  if (Unlikely((start & 0xD800) != 0xD800)) return INVALID_RUNE;
   if (Unlikely(s.len < 2)) return INVALID_RUNE;
 
   u16 second = BoToSystem(s.bo, s.buf[1]);
-  if (Unlikely((second & 0xdc00) != 0xdc00)) return INVALID_RUNE;
+  if (Unlikely((second & 0xDC00) != 0xDC00)) return INVALID_RUNE;
 
   *len = 2;
-  return (u32)0x10000 + (((u32)(start - 0xd800) << 10) | ((u32)(second - 0xdc00)));
+  return (u32)0x10000 + (((u32)(start - 0xD800) << 10) | ((u32)(second - 0xDC00)));
 
 #undef SetCodepointLen
 }
@@ -302,27 +302,27 @@ utf8_encode_codepoint(rune codepoint, u8 *s) {
     return 1;
   }
   if (codepoint < 0x800) {
-    s[0] = 0xc0 | (((u32)codepoint >> 6) & 0x1f);
-    s[1] = 0x80 |  ((u32)codepoint       & 0x3f);
+    s[0] = 0xC0 | (((u32)codepoint >> 6) & 0x1F);
+    s[1] = 0x80 |  ((u32)codepoint       & 0x3F);
     return 2;
   }
   if (codepoint < 0x10000) {
-    s[0] = 0xe0 | (((u32)codepoint >> 12) & 0x0f);
-    s[1] = 0x80 | (((u32)codepoint >>  6) & 0x3f);
-    s[2] = 0x80 |  ((u32)codepoint        & 0x3f);
+    s[0] = 0xE0 | (((u32)codepoint >> 12) & 0x0F);
+    s[1] = 0x80 | (((u32)codepoint >>  6) & 0x3F);
+    s[2] = 0x80 |  ((u32)codepoint        & 0x3F);
     return 3;
   }
-  // TODO(rutgerbrf): consider limiting the codepoint to 0x1ffff
-  s[0] = 0xf0 | (((u32)codepoint >> 18) & 0x07);
-  s[1] = 0x80 | (((u32)codepoint >> 12) & 0x3f);
-  s[2] = 0x80 | (((u32)codepoint >>  6) & 0x3f);
-  s[3] = 0x80 |  ((u32)codepoint        & 0x3f);
+  // TODO(rutgerbrf): consider limiting the codepoint to 0x1FFFF
+  s[0] = 0xF0 | (((u32)codepoint >> 18) & 0x07);
+  s[1] = 0x80 | (((u32)codepoint >> 12) & 0x3F);
+  s[2] = 0x80 | (((u32)codepoint >>  6) & 0x3F);
+  s[3] = 0x80 |  ((u32)codepoint        & 0x3F);
   return 4;
 }
 
 function u8
 utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo) {
-  if (Unlikely(codepoint >= 0xd800 && codepoint <= 0xdfff)) {
+  if (Unlikely(codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
     // Technically invalid code points
     // See the note about these codepoints from earlier.
     // We may want to encode these code point for compatibility reasons anyways.
@@ -331,8 +331,8 @@ utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo) {
 
   if (codepoint >= 0x10000) {
     codepoint -= 0x10000;
-    s[0] /* high */ = SystemToBo(bo, 0xd800 + (u32)((codepoint >> 10) & 0x3ff));
-    s[1] /* low  */ = SystemToBo(bo, 0xdc00 + (u32)( codepoint        & 0x3ff));
+    s[0] /* high */ = SystemToBo(bo, 0xD800 + (u32)((codepoint >> 10) & 0x3FF));
+    s[1] /* low  */ = SystemToBo(bo, 0xDC00 + (u32)( codepoint        & 0x3FF));
     return 2;
   }
 
@@ -342,7 +342,7 @@ utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo) {
 
 function u8
 utf16_encoded_len(rune codepoint) {
-  if (codepoint >= 0xd800 && codepoint <= 0xdfff) return 0;
+  if (codepoint >= 0xD800 && codepoint <= 0xDFFF) return 0;
   if (codepoint >= 0x10000) return 2;
   return 1;
 }
@@ -393,7 +393,7 @@ string_destroy(Mem_Base *mb, String s) {
 function void
 utf16string_destroy(Mem_Base *mb, Utf16String s) {
   // TODO(rutgerbrf): what if the user would prefer using mem_decommit?
-  mem_release(mb, s.buf, s.len*sizeof(u16));
+  mem_release(mb, s.buf, s.len * sizeof(u16));
 }
 
 function String

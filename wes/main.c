@@ -295,7 +295,7 @@ cs_resolve_type(CompileState *cs, String type_name, const Wes_Type **dest) {
 
 function bool
 is_punct(rune r) {
-  for (usize i = 0; i < ArrayCount(PUNCT); i++) {
+  for (usize i = 0; i < ArrayCount(PUNCT) - 1 /* last byte is the sentinel */; i++) {
     rune p = PUNCT[i];
     if (r == p) return true;
   }

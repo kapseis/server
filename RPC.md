@@ -29,7 +29,7 @@ response Identity_CreateUserResponse {
 	Identity_User ok;
 }
 
-Identity_CreateUserResponse identity_create_user(Identity_CreateUserRequest) @0x94be0166bbed2de0;
+Identity_CreateUserResponse identity_create_user(Identity_CreateUserRequest) @0x94BE_0166_BBED_2DE0;
 ```
 
 ## Protocol
