@@ -83,7 +83,7 @@ typedef struct Wes_Type {
   struct Wes_Type *next;
 } Wes_Type;
 
-Wes_Type primitive_types[Wes_PrimitiveType_COUNT] = {
+global const Wes_Type primitive_types[Wes_PrimitiveType_COUNT] = {
 #define X(type) [Glue(Wes_PrimitiveType_, type)] = { .name = Str(Stringify(type)), .value.primitive = Glue(Wes_PrimitiveType_, type), .kind = Wes_TypeKind_Primitive, .next = NULL },
   XM_WES_PRIMITIVE_TYPES
 #undef X
@@ -91,8 +91,8 @@ Wes_Type primitive_types[Wes_PrimitiveType_COUNT] = {
 
 typedef struct Wes_MessageField {
   String    name;
-  Wes_Type *type;
   u64       index;
+  const  Wes_Type         *type;
   struct Wes_MessageField *next;
 } Wes_MessageField;
 
@@ -104,18 +104,18 @@ typedef struct Wes_Message {
 typedef struct Wes_ResponseField {
   // type.kind == Response -> index should be 'set', status can be ignored
   // otherwise -> status should be 'set', index can be ignored
-  Wes_Type   *type;
   Wes_Status  status;
   u64         index;
+  const  Wes_Type          *type;
   struct Wes_ResponseField *next;
 } Wes_ResponseField;
 
 typedef struct Wes_Rpc {
   String    name;
   u64       ident;
-  Wes_Type *input_type;
-  Wes_Type *output_type;
-  struct Wes_Rpc *next;
+  const  Wes_Type *input_type;
+  const  Wes_Type *output_type;
+  struct Wes_Rpc  *next;
 } Wes_Rpc;
 
 typedef struct Wes_File {
@@ -211,7 +211,7 @@ MainLoop:
     // bruh we'll just skip comments here too
     if (r == '/' && cs_peek(cs, NULL) == '/') {
       while (true) {
-        rune r = cs_next(cs, NULL);
+        r = cs_next(cs, NULL);
         if (r == '\n') {
           goto MainLoop;
         } else if (r == INVALID_RUNE) { // TODO(rutgerbrf): don't catch INVALID_RUNE (can just happen randomly in text), instead, only catch EOF
@@ -277,7 +277,7 @@ cs_try_keyword(CompileState *cs, Keyword accept, Keyword *dest) {
 }
 
 function bool
-cs_resolve_type(CompileState *cs, String type_name, Wes_Type **dest) {
+cs_resolve_type(CompileState *cs, String type_name, const Wes_Type **dest) {
 #define X(name) Stmt(if (StringCmp(type_name, ==, Str(Stringify(name)))) { *dest = &primitive_types[Glue(Wes_PrimitiveType_, name)]; return true; });
   XM_WES_PRIMITIVE_TYPES
 #undef X
@@ -364,6 +364,7 @@ cs_u64_hex_lit(CompileState *cs, u64 *dest) {
     u8 r_val;
     if (r >= '0' && r <= '9') r_val = r - '0';
     else if (r >= 'A' && r <= 'F') r_val = r - 'A';
+    else return false; // TODO(rutgerbrf): save an error
     *dest = (*dest << 4) | r_val;
   }
 }

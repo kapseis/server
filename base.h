@@ -222,7 +222,7 @@ typedef enum {
   ByteOrder_LittleEndian,
 } ByteOrder;
 
-#define SYSTEM_BYTE_ORDER ((union{u8 b_[2]; u16 x_;}){.b_ = {0, 1}}.x_ == 1 ? ByteOrder_BigEndian : ByteOrder_LittleEndian)
+#define SYSTEM_BYTE_ORDER ((union { u8 b_[2]; u16 x_; }){ .b_ = { 0, 1 } }.x_ == 1 ? ByteOrder_BigEndian : ByteOrder_LittleEndian)
 
 function u64 swap_byte_order_u64(u64 x);
 function u32 swap_byte_order_u32(u32 x);
@@ -249,7 +249,7 @@ typedef struct StringList {
   struct StringList *next;
 } StringList;
 
-#define Str(str) ((String){ .buf = (str), .len = sizeof(str) - 1 })
+#define Str(str) ((String){ .buf = (const u8 *)(str), .len = sizeof(str) - 1 })
 
 function String string_from_raw(const u8 *buf, usize len);
 function void   string_destroy(Mem_Base *mb, String str);
