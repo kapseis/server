@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#if OsHasFlags(OsFlags_Posix)
+#if OsHasFlags(OS_FLAGS_POSIX)
 # include <arpa/inet.h>
 # include <netdb.h>
 # include <signal.h>

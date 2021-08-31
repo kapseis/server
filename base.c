@@ -456,7 +456,7 @@ file_is_valid_(File *f) {
 
 function ssize
 file_read(File *f, u8 *dest, usize n) {
-#if OsHasFlags(Os_Unix)
+#if OsHasFlags(OS_FLAGS_UNIX)
   MutexLockScoped(&f->fd_lock);
   Assert(file_is_valid_(f));
   ssize ret;
@@ -477,7 +477,7 @@ function s32
 file_close(File *f) {
   if (f == NULL)
     return EBADF; 
-#if OsHasFlags(OsFlags_Unix)
+#if OsHasFlags(OS_FLAGS_UNIX)
   MutexLockScoped(&f->fd_lock);
   Assert(file_is_valid_(f));
   while (close(f->fd) == -1) {
@@ -506,7 +506,7 @@ file_reader(File *f) {
 
 function s32
 file_get_size(File *f, usize *size) {
-#if OsHasFlags(OsFlags_Unix)
+#if OsHasFlags(OS_FLAGS_UNIX)
   Assert(size != NULL);
   MutexLockScoped(&f->fd_lock);
   Assert(file_is_valid_(f));
@@ -527,7 +527,7 @@ file_get_size(File *f, usize *size) {
 
 function MutexGuard
 mutex_lock(Mutex *m) {
-#if OsHasFlags(OsFlags_Posix)
+#if OsHasFlags(OS_FLAGS_POSIX)
   pthread_mutex_lock(&m->inner);
   return (MutexGuard){ .m = m };
 #else
@@ -537,7 +537,7 @@ mutex_lock(Mutex *m) {
 
 function void
 mutex_unlock_(Mutex *m) {
-#if OsHasFlags(OsFlags_Posix)
+#if OsHasFlags(OS_FLAGS_POSIX)
   pthread_mutex_unlock(&m->inner);
 #else
 # error "No mutex_unlock_ support for this OS"
@@ -546,7 +546,7 @@ mutex_unlock_(Mutex *m) {
 
 function void
 mutex_guard_unlock(MutexGuard *g) {
-#if IsCompiler(Compiler_Gcc) || IsCompiler(Compiler_Clang)
+#if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
   Mutex *m = __atomic_exchange_n(/* ptr */ &g->m, /* val */ (Mutex *)NULL, /* memorder */ __ATOMIC_SEQ_CST);
   if (m == NULL) Unreachable("Double unlock or invalid mutex guard");
   mutex_unlock_(m);

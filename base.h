@@ -1,5 +1,23 @@
 #pragma once
 
+//---------- Helper macros -----------
+
+#define Stmt(S) do { S; } while (0)
+
+#define Stringify_(S) #S
+#define Stringify(S) Stringify_(S)
+#define Glue_(A, B) A##B
+#define Glue(A, B) Glue_(A, B)
+
+#define OffsetOfMember(T, m) ((usize)&((T *)0)->m)
+#define ParentStartPtr(P, field_name, field_ptr) ((P *)((u8 *)field_ptr - OffsetOfMember(P, field_name)))
+
+#define ArrayCount(a) (sizeof(a) / sizeof(*(a)))
+
+#define global   static
+#define local    static
+#define function static
+
 //---------- Context cracking ----------
 // This section defines the following constants/macros:
 // - ARCH     (can be tested with IsArch(type))
@@ -9,7 +27,7 @@
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 # include <unistd.h>
-# if defined(_POSIX_VERSION)
+# if defined(_POSIX_VERSION) && !defined(_POSIX_SOURCE)
 #  define _POSIX_SOURCE
 # endif
 #endif
@@ -18,47 +36,63 @@
 # define _POSIX_C_SOURCE 200809L
 #endif
 
-typedef enum {
-  OsFlags_None  = 0,
-  OsFlags_Unix  = 1,
-  OsFlags_Posix = 2,
+#define OS_FLAGS_NONE  0
+#define OS_FLAGS_UNIX  1
+#define OS_FLAGS_POSIX 2
+
+typedef enum { 
+  OsFlags_None  = OS_FLAGS_NONE,
+  OsFlags_Unix  = OS_FLAGS_UNIX,
+  OsFlags_Posix = OS_FLAGS_POSIX,
 } OsFlags;
 
+#define OS_LINUX   0
+#define OS_WINDOWS 1
+#define OS_COUNT   2
+
 typedef enum {
-  Os_Linux,
-  Os_Windows,
-  Os_COUNT,
+  Os_Linux   = OS_LINUX,
+  Os_Windows = OS_WINDOWS,
+  Os_COUNT   = OS_COUNT,
 } Os;
 
-typedef enum {
-  Arch_X86,
-  Arch_X86_64,
-  Arch_COUNT,
-} Arch;
+#define ARCH_X86    0
+#define ARCH_X86_64 1
+#define ARCH_COUNT  2
 
 typedef enum {
-  Compiler_Gcc,
-  Compiler_Clang,
-  Compiler_COUNT,
+  Arch_X86    = ARCH_X86,
+  Arch_X86_64 = ARCH_X86_64,
+  Arch_COUNT  = ARCH_COUNT,
+} Arch;
+
+#define COMPILER_GCC   0
+#define COMPILER_CLANG 1
+#define COMPILER_COUNT 2
+
+typedef enum {
+  Compiler_Gcc   = COMPILER_GCC,
+  Compiler_Clang = COMPILER_CLANG,
+  Compiler_COUNT = COMPILER_COUNT,
 } Compiler;
 
 #if defined(__linux__)
-# define OS Os_Linux
-# define OS_FLAGS (OsFlags_Unix | OsFlags_Linux)
+# define OS OS_LINUX
+# define OS_FLAGS (OS_FLAGS_UNIX | OS_FLAGS_POSIX)
 #elif defined(_WIN32) || defined(_WIN64)
-# define OS Os_Windows
+# define OS OS_WINDOWS
 #endif
 
 #if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64) || defined(_M_X64) || defined(_M_AMD64)
-# define ARCH Arch_X86_64
+# define ARCH ARCH_X86_64
 #elif defined(i386) || defined(__i386) || defined(__i386__) || defined(__IA32__) || defined(_M_I86) || defined(_M_IX86) || defined(__X86__) || defined(_X86) || defined(__THW_INTEL__) || defined(__I86__) || defined(__INTEL__) || defined(__386)
-# define ARCH Arch_X86
+# define ARCH ARCH_X86
 #endif
 
 #if defined(__clang__)
-# define COMPILER Compiler_Clang
+# define COMPILER COMPILER_CLANG
 #elif defined(__GNUC__)
-# define COMPILER Compiler_Gcc
+# define COMPILER COMPILER_GCC
 #endif
 
 #if !defined(ARCH)
@@ -74,13 +108,13 @@ typedef enum {
 #endif
 
 #if !defined(OS_FLAGS)
-# define OS_FLAGS OsFlags_None
+# define OS_FLAGS OS_FLAGS_NONE
 #endif
 
 #define IsArch(type) (ARCH == type)
 #define IsCompiler(type) (COMPILER == type)
 #define IsOs(type) (OS == type)
-#define OsHasFlags(flags) ((OS & (flags)) == (flags))
+#define OsHasFlags(flags) ((OS_FLAGS & (flags)) == (flags))
 
 //---------- libc (which we'll want to get rid of later) -----------
 
@@ -92,7 +126,7 @@ typedef enum {
 
 //---------- Integer types -----------
 
-#if OsHasFlags(OsFlags_Posix)
+#if OsHasFlags(OS_FLAGS_POSIX)
 # include <sys/types.h>
 #endif
 
@@ -141,24 +175,6 @@ typedef void VoidFunc(void);
 typedef u8 bool;
 #define true  1
 #define false 0
-
-//---------- Helper macros -----------
-
-#define Stmt(S) do { S; } while (0)
-
-#define Stringify_(S) #S
-#define Stringify(S) Stringify_(S)
-#define Glue_(A, B) A##B
-#define Glue(A, B) Glue_(A, B)
-
-#define OffsetOfMember(T, m) ((usize)&((T *)0)->m)
-#define ParentStartPtr(P, field_name, field_ptr) ((P *)((u8 *)field_ptr - OffsetOfMember(P, field_name)))
-
-#define ArrayCount(a) (sizeof(a) / sizeof(*(a)))
-
-#define global   static
-#define local    static
-#define function static
 
 //----------- Memory management -----------
 
@@ -233,7 +249,7 @@ typedef struct StringList {
   struct StringList *next;
 } StringList;
 
-#define Str(str) ((String){ .buf = (str), .len = sizeof(str) - 1 })
+#define Str(str) ((String){ .buf = ((union { const char *cs; const u8 *bs; }){ .cs = (str) }).bs, .len = sizeof(str) - 1 })
 
 function String string_from_raw(const u8 *buf, usize len);
 function void   string_destroy(Mem_Base *mb, String str);
@@ -312,11 +328,11 @@ function u8    utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo);
 # define CanInclude(...) 0
 #endif
 
-#if (IsArch(Arch_X86) || IsArch(Arch_X86_64)) && CanInclude(<immintrin.h>)
+#if (IsArch(ARCH_X86) || IsArch(ARCH_X86_64)) && CanInclude(<immintrin.h>)
 # define INTEL_INTRINSICS_AVAILABLE 1
 #endif
 
-#if IsCompiler(Compiler_Gcc) || IsCompiler(Compiler_Clang)
+#if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
 # define Likely(x)   __builtin_expect((x), 1)
 # define Unlikely(x) __builtin_expect((x), 0)
 #else
@@ -327,12 +343,12 @@ function u8    utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo);
 
 //------------- Synchronization primitives -------------
 
-#if OsHasFlags(OsFlags_Posix)
+#if OsHasFlags(OS_FLAGS_POSIX)
 # include <pthread.h>
 #endif
 
 typedef struct {
-#if OsHasFlags(OsFlags_Posix)
+#if OsHasFlags(OS_FLAGS_POSIX)
   pthread_mutex_t inner; 
 #else
 # error "No mutex support for this OS"
@@ -379,7 +395,7 @@ function s32 io_read_all(Io_Reader *r, u8 *dest, usize n);
 
 //------------- Files -------------
 
-#if OsHasFlags(OsFlags_Unix)
+#if OsHasFlags(OS_FLAGS_UNIX)
 # include <fcntl.h>
 # include <sys/types.h>
 # include <sys/stat.h>
@@ -387,7 +403,7 @@ function s32 io_read_all(Io_Reader *r, u8 *dest, usize n);
 
 typedef struct {
   Mem_Base *mb;
-#if OsHasFlags(OsFlags_Unix)
+#if OsHasFlags(OS_FLAGS_UNIX)
   Mutex fd_lock;
   int fd; // -1 means invalid
 #endif
