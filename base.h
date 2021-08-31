@@ -249,7 +249,7 @@ typedef struct StringList {
   struct StringList *next;
 } StringList;
 
-#define Str(str) ((String){ .buf = ((union { const char *cs; const u8 *bs; }){ .cs = (str) }).bs, .len = sizeof(str) - 1 })
+#define Str(str) ((String){ .buf = (str), .len = sizeof(str) - 1 })
 
 function String string_from_raw(const u8 *buf, usize len);
 function void   string_destroy(Mem_Base *mb, String str);
@@ -281,24 +281,12 @@ function void        utf16string_destroy(Mem_Base *mb, Utf16String str);
 function Utf16String utf8_to_utf16(Mem_Base *mb, String s, ByteOrder bo);
 function String      utf16_to_utf8(Mem_Base *mb, Utf16String s);
 
-typedef struct {
-  usize i;
-} Utf8CodepointIterator;
-
-#define UTF8_CODEPOINT_ITERATOR_INIT ((Utf8CodepointIterator){ .i = 0 })
-
-function rune  utf8_next_codepoint(Utf8CodepointIterator *it, String s, u8 *len);
+function rune  utf8_next_codepoint(String s, u8 *len);
 function usize utf8_rune_count();
 function u8    utf8_encoded_len(rune codepoint);
 function u8    utf8_encode_codepoint(rune codepoint, u8 *s);
 
-typedef struct {
-  usize i;
-} Utf16CodepointIterator;
-
-#define UTF16_CODEPOINT_ITERATOR_INIT ((Utf16CodepointIterator){ .i = 0 })
-
-function rune  utf16_next_codepoint(Utf16CodepointIterator *it, Utf16String s, u8 *len);
+function rune  utf16_next_codepoint(Utf16String s, u8 *len);
 function usize utf16_rune_count();
 function u8    utf16_encoded_len(rune codepoint);
 function u8    utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo);
@@ -306,19 +294,21 @@ function u8    utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo);
 // Used as follows: StringEachRune(Str("asdf"), ch) printf("%c", ch);
 #define StringEachRune(s, ident) \
   String Glue(Glue(utf8str_, __LINE__), _) = (s); \
-  Utf8CodepointIterator Glue(Glue(utf8cpi_, __LINE__), _) = UTF8_CODEPOINT_ITERATOR_INIT; \
   u8 Glue(Glue(utf8cpl_, __LINE__), _); \
-  for (rune ident = utf8_next_codepoint(&Glue(Glue(utf8cpi_, __LINE__), _), Glue(Glue(utf8str_, __LINE__), _), &Glue(Glue(utf8cpl_, __LINE__), _)); \
+  for (rune ident = utf8_next_codepoint(Glue(Glue(utf8str_, __LINE__), _), &Glue(Glue(utf8cpl_, __LINE__), _)); \
     (ident != 0 || Glue(Glue(utf8cpl_, __LINE__), _) != 0) && ident != INVALID_RUNE; \
-    ident = utf8_next_codepoint(&Glue(Glue(utf8cpi_, __LINE__), _), Glue(Glue(utf8str_, __LINE__), _), &Glue(Glue(utf8cpl_, __LINE__), _)))
+    ident = utf8_next_codepoint(Glue(Glue(utf8str_, __LINE__), _), &Glue(Glue(utf8cpl_, __LINE__), _)), \
+      Glue(Glue(utf8str_, __LINE__), _).len -= Glue(Glue(utf8cpl_, __LINE__), _), \
+      Glue(Glue(utf8str_, __LINE__), _).buf += Glue(Glue(utf8cpl_, __LINE__), _))
 
 #define Utf16StringEachRune(s, ident) \
   Utf16String Glue(Glue(utf16str_, __LINE__), _) = (s); \
-  Utf16CodepointIterator Glue(Glue(utf16cpi_, __LINE__), _) = UTF16_CODEPOINT_ITERATOR_INIT; \
   u8 Glue(Glue(utf16cpl_, __LINE__), _); \
-  for (rune ident = utf16_next_codepoint(&Glue(Glue(utf16cpi_, __LINE__), _), Glue(Glue(utf16str_, __LINE__), _), &Glue(Glue(utf16cpl_, __LINE__), _)); \
+  for (rune ident = utf16_next_codepoint(Glue(Glue(utf16str_, __LINE__), _), &Glue(Glue(utf16cpl_, __LINE__), _)); \
     (ident != 0 || Glue(Glue(utf16cpl_, __LINE__), _) != 0) && ident != INVALID_RUNE; \
-    ident = utf16_next_codepoint(&Glue(Glue(utf16cpi_, __LINE__), _), Glue(Glue(utf16str_, __LINE__), _), &Glue(Glue(utf16cpl_, __LINE__), _)))
+    ident = utf16_next_codepoint(Glue(Glue(utf16str_, __LINE__), _), &Glue(Glue(utf16cpl_, __LINE__), _)), \
+      Glue(Glue(utf16str_, __LINE__), _).len -= Glue(Glue(utf16cpl_, __LINE__), _), \
+      Glue(Glue(utf16str_, __LINE__), _).buf += Glue(Glue(utf16cpl_, __LINE__), _))
 
 //------------- Intrinsics --------------
 

@@ -182,64 +182,63 @@ utf16string_from_raw(u16 *buf, usize len, ByteOrder bo) {
 // It should also be (heavily) optimized. There's a lot of potential for that.
 // Golang is faster at processing UTF-8 than this implementation. We could be faster.
 function rune
-utf8_next_codepoint(Utf8CodepointIterator *it, String s, u8 *len) {
-#define SetCodepointLen(n) Stmt(if (len) *len = n)
-#define AssertRemainingCapacity(n) Stmt(if (Unlikely(s.len - it->i < (n))) return INVALID_RUNE)
+utf8_next_codepoint(String s, u8 *len) {
+#define AssertMinLength(n) Stmt(if (Unlikely(s.len < n)) return INVALID_RUNE)
 
-  SetCodepointLen(0);
-  if (Unlikely(it->i == s.len)) {
+  *len = 0;
+  if (Unlikely(s.len == 0)) {
     // This way the caller can still distinguish NUL characters from EOFs,
     // because for those, *len would be set to 1.
     return 0;
   }
 
-  u8 start = s.buf[it->i++];
+  u8 start = s.buf[0];
   if ((start & 0x80) != 0x80) { // start & 0b1000_0000 != 0b1000_0000
     // An ASCII codepoint.
-    SetCodepointLen(1);
+    *len = 1;
     return (rune)start;
   } else if ((start & 0xe0) == 0xc0) { // start & 0b1110_0000 == 0b1100_0000
     // One byte follows
-    AssertRemainingCapacity(1);
-    u8 second = s.buf[it->i++];
+    AssertMinLength(2);
+    u8 second = s.buf[1];
     u8 second_data = second & 0x7f;
     if (Unlikely(second_data == second)) return INVALID_RUNE;
-    SetCodepointLen(2);
+    *len = 2;
     // ((start & 0b0001_1111) << 6) | (second & 0b0011_1111)
     return ((u32)(start & 0x1f) << 6) + (u32)(second & 0x3f);
   } else if ((start & 0xf0) == 0xe0) { // start & 0b1111_0000 == 0b1110_0000
     // Two bytes follow
-    AssertRemainingCapacity(2);
-    u8 second = s.buf[it->i++];
+    AssertMinLength(3);
+    u8 second = s.buf[1];
     u8 second_data = second & 0x7f;
     if (Unlikely(second_data == second)) return INVALID_RUNE;
-    u8 third = s.buf[it->i++];
+    u8 third = s.buf[2];
     u8 third_data = third & 0x7f;
     if (Unlikely(third_data == third)) return INVALID_RUNE;
     //   ((start  & 0b0000_1111) << 12)
     // + ((second & 0b0011_1111) <<  6)
     // +  (third  & 0b0011_1111)
-    SetCodepointLen(3);   
+    *len = 3;
     return ((u32)(start  & 0x0f) << 12)
          + ((u32)(second & 0x3f) <<  6)
          +  (u32)(third  & 0x3f);
   } else if ((start & 0xf8) == 0xf0) { // start & 0b1111_1000 == 0b1111_0000
     // Three bytes follow
-    AssertRemainingCapacity(3);
-    u8 second = s.buf[it->i++];
+    AssertMinLength(4);
+    u8 second = s.buf[1];
     u8 second_data = second & 0x7f;
     if (Unlikely(second_data == second)) return INVALID_RUNE;
-    u8 third = s.buf[it->i++];
+    u8 third = s.buf[2];
     u8 third_data = third & 0x7f;
     if (Unlikely(third_data == third)) return INVALID_RUNE;
-    u8 fourth = s.buf[it->i++];
+    u8 fourth = s.buf[3];
     u8 fourth_data = fourth & 0x7f;
     if (Unlikely(fourth_data == fourth)) return INVALID_RUNE;
     //   ((start  & 0b0000_0111) << 18)
     // + ((second & 0b0011_1111) << 12)
     // + ((third  & 0b0011_1111) <<  6)
     // +  (fourth & 0b0011_1111)
-    SetCodepointLen(4);
+    *len = 4;
     return ((u32)(start  & 0x07) << 18)
          + ((u32)(second & 0x3f) << 12)
          + ((u32)(third  & 0x3f) <<  6)
@@ -248,7 +247,6 @@ utf8_next_codepoint(Utf8CodepointIterator *it, String s, u8 *len) {
 
   return INVALID_RUNE;
 
-#undef SetCodepointLen
 #undef AssertRemainingCapacity
 }
 
@@ -268,19 +266,17 @@ utf8_encoded_len(rune codepoint) {
 }
 
 function rune
-utf16_next_codepoint(Utf16CodepointIterator *it, Utf16String s, u8 *len) {
-#define SetCodepointLen(n) Stmt(if (len) *len = n)
-  
-  SetCodepointLen(0);
-  if (Unlikely(it->i == s.len)) {
+utf16_next_codepoint(Utf16String s, u8 *len) {
+  *len = 0;
+  if (Unlikely(s.len == 0)) {
     // This way the caller can still distinguish NUL characters from EOFs,
     // because for those, *len would be set to 1.
     return 0;
   }
 
-  u16 start = BoToSystem(s.bo, s.buf[it->i++]);
+  u16 start = BoToSystem(s.bo, s.buf[0]);
   if (start < 0xd800 || start > 0xdfff) {
-    SetCodepointLen(1);
+    *len = 1;
     return (rune)start;
   }
 
@@ -288,12 +284,12 @@ utf16_next_codepoint(Utf16CodepointIterator *it, Utf16String s, u8 *len) {
   //  With regard to https://en.wikipedia.org/wiki/UTF-16#U.2BD800_to_U.2BDFFF,
   //  we may not actually these checks to result in an error.
   if (Unlikely((start & 0xd800) != 0xd800)) return INVALID_RUNE;
-  if (Unlikely(s.len - it->i == 0)) return INVALID_RUNE;
+  if (Unlikely(s.len < 2)) return INVALID_RUNE;
 
-  u16 second = BoToSystem(s.bo, s.buf[it->i++]);
+  u16 second = BoToSystem(s.bo, s.buf[1]);
   if (Unlikely((second & 0xdc00) != 0xdc00)) return INVALID_RUNE;
 
-  SetCodepointLen(2);
+  *len = 2;
   return (u32)0x10000 + (((u32)(start - 0xd800) << 10) | ((u32)(second - 0xdc00)));
 
 #undef SetCodepointLen
@@ -573,12 +569,18 @@ io_read_all(Io_Reader *r, u8 *dest, usize n) {
 }
 
 #if ENABLE_UNREACHABLE
+# if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
+__attribute__((noreturn))
+# endif
 function void *
 unreachable(String loc, String reason) {
   fputs("Reached unreachable code", stderr);
   if (loc.len != 0) fprintf(stderr, " (%.*s)", reason.len, reason.buf);
   fprintf(stderr, ": %.*s", reason.len, reason.buf);
   AssertBreak();
+# if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
+  __builtin_unreachable();
+# endif
   return NULL; // never reached
 }
 #endif

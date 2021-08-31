@@ -132,10 +132,10 @@ typedef enum {
 
 typedef struct {
   Mem_Base *mb;
-  Utf8CodepointIterator it;
   String    file_contents;
   Wes_Type *types;
   Wes_Rpc  *rpcs;
+  usize     i;
 } CompileState;
 
 function void
@@ -174,7 +174,14 @@ cs_push_rpc(CompileState *cs, Wes_Rpc c) {
 
 function rune
 cs_next(CompileState *cs, u8 *len) {
-  return utf8_next_codepoint(&cs->it, cs->file_contents, len);
+  String sliced = cs->file_contents;
+  sliced.len -= cs->i;
+  sliced.buf += cs->i;
+  u8 codepoint_len = 0;
+  rune r = utf8_next_codepoint(sliced, &codepoint_len);
+  cs->i += codepoint_len;
+  if (len != NULL) *len = codepoint_len;
+  return r;
 }
 
 function rune
@@ -182,7 +189,7 @@ cs_peek(CompileState *cs, u8 *len) {
   u8 codepoint_len = 0;
   rune r = cs_next(cs, &codepoint_len);
   if (len != NULL) *len = codepoint_len;
-  cs->it.i -= codepoint_len;
+  cs->i -= codepoint_len;
   return r;
 }
 
@@ -190,7 +197,7 @@ function bool
 cs_try_ch(CompileState *cs, rune ch) {
   u8 len;
   rune r = cs_peek(cs, &len);
-  if (r == ch) cs->it.i += len;
+  if (r == ch) cs->i += len;
   // TODO(rutgerbrf): save error
   return r == ch;
 }
@@ -213,7 +220,7 @@ MainLoop:
       }
     }
     if (!isspace(r)) {
-      cs->it.i -= codepoint_len;
+      cs->i -= codepoint_len;
       break;
     }
   }
@@ -229,9 +236,9 @@ cs_try_ident(CompileState *cs, String *dest) {
     if ((total_len == 0 && !isalpha(r)) || !(isalnum(r) || r == '_')) break;
     total_len += codepoint_len;
   }
-  cs->it.i -= codepoint_len;
+  cs->i -= codepoint_len;
   if (total_len == 0) return false;
-  *dest = string_slice(cs->file_contents, cs->it.i - total_len, total_len);
+  *dest = string_slice(cs->file_contents, cs->i - total_len, total_len);
   return true;
 }
 
@@ -265,7 +272,7 @@ cs_try_keyword(CompileState *cs, Keyword accept, Keyword *dest) {
     return true;
   }
 
-  cs->it.i -= str.len;
+  cs->i -= str.len;
   return false;
 }
 
@@ -304,11 +311,11 @@ cs_u64_dec_lit(CompileState *cs, u64 *dest) {
     if (r < '0' || r > '9') {
       if (r == '_') continue;
       if (!is_punct(r) && !isspace(r)) {
-        cs->it.i -= r_len;
+        cs->i -= r_len;
         // TODO(rutgerbrf): save an error
         return false;
       }
-      cs->it.i -= r_len;
+      cs->i -= r_len;
       return true;
     }
 
@@ -325,11 +332,11 @@ cs_u64_oct_lit(CompileState *cs, u64 *dest) {
     if (r < '0' || r > '7') {
       if (r == '_') continue;
       if (!is_punct(r) && !isspace(r)) {
-        cs->it.i -= r_len;
+        cs->i -= r_len;
         // TODO(rutgerbrf): save an error
         return false;
       }
-      cs->it.i -= r_len;
+      cs->i -= r_len;
       return true;
     }
 
@@ -346,11 +353,11 @@ cs_u64_hex_lit(CompileState *cs, u64 *dest) {
     if ((r < '0' || r > '9') && (r < 'A' || r > 'F')) {
       if (r == '_') continue;
       if (!is_punct(r) && !isspace(r)) {
-        cs->it.i -= r_len;
+        cs->i -= r_len;
         // TODO(rutgerbrf): save an error
         return false;
       }
-      cs->it.i -= r_len;
+      cs->i -= r_len;
       return true;
     }
 
@@ -370,11 +377,11 @@ cs_u64_bin_lit(CompileState *cs, u64 *dest) {
     if (r < '0' || r > '1') {
       if (r == '_') continue;
       if (!is_punct(r) && !isspace(r)) {
-        cs->it.i -= r_len;
+        cs->i -= r_len;
         // TODO(rutgerbrf): save an error
         return false;
       }
-      cs->it.i -= r_len;
+      cs->i -= r_len;
       return true;
     }
     *dest = (*dest << 1) | (r - '0');
@@ -386,7 +393,7 @@ cs_u64_lit(CompileState *cs, u64 *dest) {
   u8 r_len;
   rune r = cs_peek(cs, &r_len);
   if (r == '0') {
-    cs->it.i += r_len;
+    cs->i += r_len;
     rune type = cs_next(cs, &r_len);
 
     switch (type) {
@@ -397,7 +404,7 @@ cs_u64_lit(CompileState *cs, u64 *dest) {
     case 'x':
       return cs_u64_hex_lit(cs, dest);
     default:
-      cs->it.i -= r_len;
+      cs->i -= r_len;
       if (is_punct(type) || isspace(type)) { // it's just a zero
         *dest = 0;
         return true;
@@ -591,9 +598,9 @@ compile_source(Mem_Base *mb, String filename, String contents) {
   printf("Compiling source file %.*s\n", filename.len, filename.buf);
 
   CompileState cs = {
-    .mb = mb,
-    .it = UTF8_CODEPOINT_ITERATOR_INIT,
     .file_contents = contents,
+    .i  = 0,
+    .mb = mb,
   };
 
   while (true) {
