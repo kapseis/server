@@ -14,6 +14,11 @@
 
 #define ArrayCount(a) (sizeof(a) / sizeof(*(a)))
 
+#define Min(a, b) ((a) < (b) ? (a) : (b))
+#define Max(a, b) ((a) > (b) ? (a) : (b))
+#define ClampTop(x, max) Min(x, max)
+#define ClampBot(x, min) Max(x, min)
+
 #define global   static
 #define local    static
 #define function static
@@ -198,7 +203,7 @@ function void  mem_release(Mem_Base *mb, void *p, usize size);
 
 function void  mem_noop_mem_change(void *ctx, void *p, usize size);
 
-function Mem_Base *mem_malloc_base();
+function Mem_Base *mem_malloc_base(void);
 
 typedef struct {
   Mem_Base *mb;
@@ -228,14 +233,34 @@ function u64 swap_byte_order_u64(u64 x);
 function u32 swap_byte_order_u32(u32 x);
 function u16 swap_byte_order_u16(u16 x);
 
-#define SwapByteOrder(x) _Generic((x), u64: swap_byte_order_u64, u32: swap_byte_order_u32, u16: swap_byte_order_u16)(x)
+#define SwapByteOrder(x, bits) Glue(swap_byte_order_u, bits)(x)
 
-#define SystemToBo(bo, x) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x))
-#define BoToSystem(bo, x) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x))
-#define SystemToLe(x) SystemToBo(ByteOrder_LittleEndian)
-#define SystemToBe(x) SystemToBo(ByteOrder_BigEndian)
-#define LeToSystem(x) BoToSystem(ByteOrder_LittleEndian)
-#define BeToSystem(x) BoToSystem(ByteOrder_BigEndian)
+#define SystemToBo(x, bits, bo) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x, bits))
+#define BoToSystem(x, bits, bo) ((SYSTEM_BYTE_ORDER == (bo)) ? (x) : SwapByteOrder(x, bits))
+#define SystemToLe(x, bits) SystemToBo((x), bits, ByteOrder_LittleEndian)
+#define SystemToBe(x, bits) SystemToBo((x), bits, ByteOrder_BigEndian)
+#define LeToSystem(x, bits) BoToSystem((x), bits, ByteOrder_LittleEndian)
+#define BeToSystem(x, bits) BoToSystem((x), bits, ByteOrder_BigEndian)
+
+#define U64FromBo(x, bo) BoToSystem((x), 64, (bo))
+#define U64FromBe(x) BeToSystem((x), 64)
+#define U64FromLe(x) LeToSystem((x), 64)
+#define U32FromBo(x, bo) BoToSystem((x), 32, (bo))
+#define U32FromBe(x) BeToSystem((x), 32)
+#define U32FromLe(x) LeToSystem((x), 32)
+#define U16FromBo(x, bo) BoToSystem((x), 16, (bo))
+#define U16FromBe(x) BeToSystem((x), 16)
+#define U16FromLe(x) LeToSystem((x), 16)
+
+#define U64ToBo(x, bo) SystemToBo((x), 64, (bo))
+#define U64ToBe(x) SystemToBe((x), 64)
+#define U64ToLe(x) SystemToLe((x), 64)
+#define U32ToBo(x, bo) SystemToBo((x), 32, (bo))
+#define U32ToBe(x) SystemToBe((x), 32)
+#define U32ToLe(x) SystemToLe((x), 32)
+#define U16ToBo(x, bo) SystemToBo((x), 16, (bo))
+#define U16ToBe(x) SystemToBe((x), 16)
+#define U16ToLe(x) SystemToLe((x), 16)
 
 //----------- Strings -----------
 
@@ -282,12 +307,12 @@ function Utf16String utf8_to_utf16(Mem_Base *mb, String s, ByteOrder bo);
 function String      utf16_to_utf8(Mem_Base *mb, Utf16String s);
 
 function rune  utf8_next_codepoint(String s, u8 *len);
-function usize utf8_rune_count();
+function usize utf8_rune_count(String s);
 function u8    utf8_encoded_len(rune codepoint);
 function u8    utf8_encode_codepoint(rune codepoint, u8 *s);
 
 function rune  utf16_next_codepoint(Utf16String s, u8 *len);
-function usize utf16_rune_count();
+function usize utf16_rune_count(Utf16String s);
 function u8    utf16_encoded_len(rune codepoint);
 function u8    utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo);
 
@@ -406,9 +431,11 @@ function s32   file_get_size(File *f, usize *size);
 function s32   file_cleanup_close(File **f);
 function ssize file_read(File *f, u8 *dest, usize n);
 
+#if 0 // TODO(rutgerbrf): implement
 function Io_Reader file_reader(File *f);
 function Io_Writer file_writer(File *f);
 function Io_Closer file_closer(File *f);
+#endif
 
 #define FILE_AUTO_CLOSE __attribute__((__cleanup__(file_cleanup_close)))
 

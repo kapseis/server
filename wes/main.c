@@ -86,7 +86,7 @@ typedef struct Wes_Type {
 global Wes_Type primitive_types[Wes_PrimitiveType_COUNT];
 
 function void
-wes_init_primitive_types() {
+wes_init_primitive_types(void) {
 #define X(type) primitive_types[Glue(Wes_PrimitiveType_, type)] = (Wes_Type){ .name = Str(Stringify(type)), .value.primitive = Glue(Wes_PrimitiveType_, type), .kind = Wes_TypeKind_Primitive, .next = NULL };
     XM_WES_PRIMITIVE_TYPES
 #undef X
@@ -322,7 +322,7 @@ cs_u64_dec_lit(CompileState *cs, u64 *dest) {
       return true;
     }
 
-    *dest = (*dest * 10) + (r - '0');
+    *dest = (*dest * 10) + ((u64)r - '0');
   }
 }
 
@@ -343,7 +343,7 @@ cs_u64_oct_lit(CompileState *cs, u64 *dest) {
       return true;
     }
 
-    *dest = (*dest << 3) | (r - '0');
+    *dest = (*dest << 3) | ((u64)r - '0');
   }
 }
 
@@ -365,8 +365,8 @@ cs_u64_hex_lit(CompileState *cs, u64 *dest) {
     }
 
     u8 r_val;
-    if (r >= '0' && r <= '9') r_val = r - '0';
-    else if (r >= 'A' && r <= 'F') r_val = r - 'A';
+    if (r >= '0' && r <= '9') r_val = (u8)(r - '0');
+    else if (r >= 'A' && r <= 'F') r_val = (u8)(r - 'A');
     else return false; // TODO(rutgerbrf): save an error
     *dest = (*dest << 4) | r_val;
   }
@@ -388,7 +388,7 @@ cs_u64_bin_lit(CompileState *cs, u64 *dest) {
       cs->i -= r_len;
       return true;
     }
-    *dest = (*dest << 1) | (r - '0');
+    *dest = (*dest << 1) | (u64)(r - '0');
   }
 }
 
@@ -444,7 +444,8 @@ cs_msg(CompileState *cs) {
   if (!cs_try_ident(cs, &type.name)) return false;
   cs_skip_whitespace(cs);
   if (!cs_try_ch(cs, '{')) return false;
-  printf("Message name: %.*s\n", type.name.len, type.name.buf);
+  s32 type_name_len = ClampTop(type_name_len, S32_MAX);
+  printf("Message name: %.*s\n", type_name_len, type.name.buf);
 
   while (true) {
     cs_skip_whitespace(cs);
@@ -463,7 +464,8 @@ cs_msg(CompileState *cs) {
 }
 
 function bool
-cs_import(CompileState *cs) {
+cs_import(CompileState *cs_) {
+  (void)cs_;
   return false;
 }
 
@@ -499,7 +501,8 @@ cs_rsp(CompileState *cs) {
   if (!cs_try_ident(cs, &type.name)) return false;
   cs_skip_whitespace(cs);
   if (!cs_try_ch(cs, '{')) return false;
-  printf("Response name: %.*s\n", type.name.len, type.name.buf);
+  s32 type_name_len = (s32)ClampTop(type.name.len, S32_MAX);
+  printf("Response name: %.*s\n", type_name_len, type.name.buf);
 
   while (true) {
     cs_skip_whitespace(cs);
@@ -536,7 +539,10 @@ cs_rpc(CompileState *cs) {
   if (!cs_try_ch(cs, '@')) return false;
   if (!cs_u64_lit(cs, &rpc.ident)) return false;
 
-  printf("Read an RPC: %.*s (%.*s -> %.*s)\n", rpc.name.len, rpc.name.buf, rpc.input_type->name.len, rpc.input_type->name.buf, rpc.output_type->name.len, rpc.output_type->name.buf);
+  s32 rpc_name_len = (s32)ClampTop(rpc.name.len, S32_MAX);
+  s32 input_type_name_len = (s32)ClampTop(rpc.input_type->name.len, S32_MAX);
+  s32 output_type_name_len = (s32)ClampTop(rpc.output_type->name.len, S32_MAX);
+  printf("Read an RPC: %.*s (%.*s -> %.*s)\n", rpc_name_len, rpc.name.buf, input_type_name_len, rpc.input_type->name.buf, output_type_name_len, rpc.output_type->name.buf);
 
   cs_push_rpc(cs, rpc);
 
@@ -572,11 +578,17 @@ wes_type_destroy(CompileState *cs, Wes_Type *t) {
   case Wes_TypeKind_Response:
     wes_destroy_response_fields(cs, t->value.response);
     break;
+  case Wes_TypeKind_Enumeration: break;
+  case Wes_TypeKind_Primitive: break;
+  case Wes_TypeKind_Alias: break;
+  default: break;
   }
 }
 
 function void
-wes_rpc_destroy(CompileState *cs, Wes_Rpc *c) {}
+wes_rpc_destroy(CompileState *cs_, Wes_Rpc *c_) {
+  (void)cs_; (void)c_;
+}
 
 function void
 cs_destroy(CompileState *cs) {
@@ -599,7 +611,8 @@ cs_destroy(CompileState *cs) {
 
 function s32
 compile_source(Mem_Base *mb, String filename, String contents) {
-  printf("Compiling source file %.*s\n", filename.len, filename.buf);
+  s32 filename_len = (s32)ClampTop(filename.len, S32_MAX);
+  printf("Compiling source file %.*s\n", filename_len, filename.buf);
 
   CompileState cs = {
     .file_contents = contents,

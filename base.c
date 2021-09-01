@@ -103,7 +103,7 @@ mem_malloc_release(void *ctx_, void *p, usize size_) {
 }
 
 function Mem_Base *
-mem_malloc_base() {
+mem_malloc_base(void) {
   local Mem_Base base = {0};
   if (base.reserve == NULL) { 
     base.reserve  = mem_malloc_reserve;
@@ -136,7 +136,7 @@ ststring_length(const char *str, char sentinel) {
   // of the last byte of the string, so we decrement it by one.
   end--;
   Assert(*end == sentinel);
-  return end - str;
+  return (usize)end - (usize)str;
 }
 
 function String
@@ -154,7 +154,8 @@ string_from_c(Mem_Base *mb, const char *str) {
 
 function char *
 string_to_st(Mem_Base *mb, String s, char sentinel) {
-  char *ststr = malloc(s.len + 1);
+  char *ststr = mem_reserve(mb, s.len + 1);
+  mem_commit(mb, ststr, s.len + 1);
   memmove(ststr, s.buf, s.len);
   ststr[s.len] = sentinel;
   return ststr;
@@ -211,7 +212,7 @@ utf8_next_codepoint(String s, u8 *len) {
     if (Unlikely(second_data == second)) return INVALID_RUNE;
     *len = 2;
     // ((start & 0b0001_1111) << 6) | (second & 0b0011_1111)
-    return ((u32)(start & 0x1F) << 6) + (u32)(second & 0x3F);
+    return (rune)((u32)(start & 0x1F) << 6) + (rune)(second & 0x3F);
   } else if ((start & 0xF0) == 0xE0) { // start & 0b1111_0000 == 0b1110_0000
     // Two bytes follow
     AssertMinLength(3);
@@ -225,9 +226,9 @@ utf8_next_codepoint(String s, u8 *len) {
     // + ((second & 0b0011_1111) <<  6)
     // +  (third  & 0b0011_1111)
     *len = 3;
-    return ((u32)(start  & 0x0F) << 12)
-         + ((u32)(second & 0x3F) <<  6)
-         +  (u32)(third  & 0x3F);
+    return (rune)((u32)(start  & 0x0F) << 12)
+         + (rune)((u32)(second & 0x3F) <<  6)
+         + (rune)      (third  & 0x3F);
   } else if ((start & 0xF8) == 0xF0) { // start & 0b1111_1000 == 0b1111_0000
     // Three bytes follow
     AssertMinLength(4);
@@ -245,10 +246,10 @@ utf8_next_codepoint(String s, u8 *len) {
     // + ((third  & 0b0011_1111) <<  6)
     // +  (fourth & 0b0011_1111)
     *len = 4;
-    return ((u32)(start  & 0x07) << 18)
-         + ((u32)(second & 0x3F) << 12)
-         + ((u32)(third  & 0x3F) <<  6)
-         +  (u32)(fourth & 0x3F);
+    return (rune)((u32)(start  & 0x07) << 18)
+         + (rune)((u32)(second & 0x3F) << 12)
+         + (rune)((u32)(third  & 0x3F) <<  6)
+         +       (rune)(fourth & 0x3F);
   }
 
   return INVALID_RUNE;
@@ -280,7 +281,7 @@ utf16_next_codepoint(Utf16String s, u8 *len) {
     return 0;
   }
 
-  u16 start = BoToSystem(s.bo, s.buf[0]);
+  u16 start = U16FromBo(s.buf[0], s.bo);
   if (start < 0xD800 || start > 0xDFFF) {
     *len = 1;
     return (rune)start;
@@ -292,11 +293,11 @@ utf16_next_codepoint(Utf16String s, u8 *len) {
   if (Unlikely((start & 0xD800) != 0xD800)) return INVALID_RUNE;
   if (Unlikely(s.len < 2)) return INVALID_RUNE;
 
-  u16 second = BoToSystem(s.bo, s.buf[1]);
+  u16 second = U16FromBo(s.buf[1], s.bo);
   if (Unlikely((second & 0xDC00) != 0xDC00)) return INVALID_RUNE;
 
   *len = 2;
-  return (u32)0x10000 + (((u32)(start - 0xD800) << 10) | ((u32)(second - 0xDC00)));
+  return (rune)0x10000 + (rune)(((u32)(start - 0xD800) << 10) | (u32)(second - 0xDC00));
 
 #undef SetCodepointLen
 }
@@ -304,25 +305,25 @@ utf16_next_codepoint(Utf16String s, u8 *len) {
 function u8
 utf8_encode_codepoint(rune codepoint, u8 *s) {
   if (codepoint < 0x80) {
-    *s = codepoint;
+    *s = (u8)codepoint;
     return 1;
   }
   if (codepoint < 0x800) {
-    s[0] = 0xC0 | (((u32)codepoint >> 6) & 0x1F);
-    s[1] = 0x80 |  ((u32)codepoint       & 0x3F);
+    s[0] = (u8)(0xC0 | (((u32)codepoint >> 6) & 0x1F));
+    s[1] = (u8)(0x80 |  ((u32)codepoint       & 0x3F));
     return 2;
   }
   if (codepoint < 0x10000) {
-    s[0] = 0xE0 | (((u32)codepoint >> 12) & 0x0F);
-    s[1] = 0x80 | (((u32)codepoint >>  6) & 0x3F);
-    s[2] = 0x80 |  ((u32)codepoint        & 0x3F);
+    s[0] = (u8)(0xE0 | (((u32)codepoint >> 12) & 0x0F));
+    s[1] = (u8)(0x80 | (((u32)codepoint >>  6) & 0x3F));
+    s[2] = (u8)(0x80 |  ((u32)codepoint        & 0x3F));
     return 3;
   }
   // TODO(rutgerbrf): consider limiting the codepoint to 0x1FFFF
-  s[0] = 0xF0 | (((u32)codepoint >> 18) & 0x07);
-  s[1] = 0x80 | (((u32)codepoint >> 12) & 0x3F);
-  s[2] = 0x80 | (((u32)codepoint >>  6) & 0x3F);
-  s[3] = 0x80 |  ((u32)codepoint        & 0x3F);
+  s[0] = (u8)(0xF0 | (((u32)codepoint >> 18) & 0x07));
+  s[1] = (u8)(0x80 | (((u32)codepoint >> 12) & 0x3F));
+  s[2] = (u8)(0x80 | (((u32)codepoint >>  6) & 0x3F));
+  s[3] = (u8)(0x80 |  ((u32)codepoint        & 0x3F));
   return 4;
 }
 
@@ -337,12 +338,12 @@ utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo) {
 
   if (codepoint >= 0x10000) {
     codepoint -= 0x10000;
-    s[0] /* high */ = SystemToBo(bo, 0xD800 + (u32)((codepoint >> 10) & 0x3FF));
-    s[1] /* low  */ = SystemToBo(bo, 0xDC00 + (u32)( codepoint        & 0x3FF));
+    s[0] /* high */ = U16ToBo((u16)(0xD800 + (((u16)codepoint >> 10) & 0x3FF)), bo);
+    s[1] /* low  */ = U16ToBo((u16)(0xDC00 +       (codepoint        & 0x3FF)), bo);
     return 2;
   }
 
-  *s = SystemToBo(bo, (u16)codepoint);
+  *s = U16FromBo((u16)codepoint, bo);
   return 1;
 }
 
@@ -393,7 +394,7 @@ utf16_to_utf8(Mem_Base *mb, Utf16String s) {
 function void
 string_destroy(Mem_Base *mb, String s) {
   // TODO(rutgerbrf): what if the user would prefer using mem_decommit?
-  mem_release(mb, (void *)s.buf, s.len);
+  mem_release(mb, (union { void *p; const u8 *buf; }){ .buf = s.buf }.p, s.len);
 }
 
 function void
@@ -520,7 +521,8 @@ file_get_size(File *f, usize *size) {
     default:    return errno;
     }
   }
-  *size = statbuf.st_size;
+  Assert(statbuf.st_size >= 0);
+  *size = (usize)statbuf.st_size;
   return 0;
 #else
 # error "file_get_size is not implemented for this OS"
@@ -562,14 +564,24 @@ io_read(Io_Reader *r, u8 *dest, usize n) {
   return r->read(r->ctx, dest, n);
 }
 
+function ssize
+io_write(Io_Writer *w, u8 *dest, usize n) {
+  return w->write(w->ctx, dest, n);
+}
+
+function s32
+io_close(Io_Closer *c) {
+  return c->close(c->ctx);
+}
+
 function s32
 io_read_all(Io_Reader *r, u8 *dest, usize n) {
-  ssize total_read = 0;
-  ssize this_call_read = 0;
-  while (total_read < n) {
-    this_call_read = io_read(r, dest + total_read, n - total_read);
-    if (this_call_read < 0) return errno;
-    total_read += this_call_read;
+  while (n > 0) {
+    ssize read = io_read(r, dest, n);
+    if (read < 0) return errno;
+    Assert((usize)read <= n);
+    n    -= (usize)read;
+    dest += (usize)read;
   }
   return 0;
 }
@@ -581,13 +593,15 @@ __attribute__((noreturn))
 function void *
 unreachable(String loc, String reason) {
   fputs("Reached unreachable code", stderr);
-  if (loc.len != 0) fprintf(stderr, " (%.*s)", reason.len, reason.buf);
-  fprintf(stderr, ": %.*s", reason.len, reason.buf);
+  s32 reason_len = (s32)ClampTop(reason.len, S32_MAX);
+  if (loc.len != 0) fprintf(stderr, " (%.*s)", reason_len, reason.buf);
+  fprintf(stderr, ": %.*s", reason_len, reason.buf);
   AssertBreak();
 # if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
   __builtin_unreachable();
-# endif
+# else
   return NULL; // never reached
+# endif
 }
 #endif
 
@@ -603,4 +617,3 @@ string_cmp(String a, String b) {
   }
   return 0;
 }
-

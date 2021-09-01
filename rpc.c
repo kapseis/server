@@ -128,12 +128,16 @@ reset:
   return 0;
 }
 
-function u64
+function RpcResponse
 rpc_server_handle(RpcServer *srv, u64 uid, Slice(u8) data) {
   for (usize i = 0; i < SliceLen(srv->handlers); i++) {
     RpcHandler hdlr = srv->handlers.items[i];
-    if (hdlr.uid == uid) hdlr.f(srv, data, hdlr.ctx);
+    if (hdlr.uid == uid) return hdlr.f(srv, data, hdlr.ctx);
   }
+  return (RpcResponse){
+    .code = 5, /* not found */
+    .data = SliceNew(u8, srv->mb),
+  };
 }
 
 function void
@@ -152,8 +156,10 @@ slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usize item_size) 
   void *new_items = mem_reserve(mb, item_size * *cap * 2);
   mem_commit(mb, new_items, item_size * *cap * 2);
   memmove(new_items, *items, item_size * *len);
-  mem_decommit(mb, *items, item_size * *cap);
-  mem_release(mb, *items, item_size * *cap);
+  if (*items != NULL) {
+    mem_decommit(mb, *items, item_size * *cap);
+    mem_release(mb, *items, item_size * *cap);
+  }
   *items = new_items;
   *cap *= 2;
 }

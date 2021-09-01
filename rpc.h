@@ -25,7 +25,7 @@ function void slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usi
 
 #define DefSlice(t) struct Glue(Slice_, t) { usize len; usize cap; Mem_Base *mb; t *items; }
 #define Slice(t) struct Glue(Slice_, t)
-#define SliceNew(t, mb) (Slice(t)){ .len = 0, .cap = 0, .mb = mb, .items = NULL }
+#define SliceNew(t, membase) (Slice(t)){ .len = 0, .cap = 0, .mb = (membase), .items = NULL }
 #define $(s, i) ((i >= s.len) ? (s.items = Unreachable("index out of bounds")) : &s.items[i])
 #define SliceAppend(sp, v) do {                                                                  \
     if ((sp)->len + 1 > (sp)->cap)                                                               \
@@ -36,12 +36,12 @@ function void slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usi
 
 struct RpcServer;
 
+DefSlice(u8);
 typedef struct RpcResponse {
-  u8  code;
-  u8 *data;
+  u8        code;
+  Slice(u8) data;
 } RpcResponse;
 
-DefSlice(u8);
 typedef RpcResponse RpcHandlerFunc(struct RpcServer *srv, Slice(u8) data, void *ctx);
 
 typedef struct RpcHandler {
@@ -52,6 +52,8 @@ typedef struct RpcHandler {
 DefSlice(RpcHandler);
 
 typedef struct RpcServer {
+  Mem_Base *mb;
+
   mbedtls_x509_crt          cert;
   mbedtls_pk_context        pk;
   mbedtls_net_context       listen_fd;
