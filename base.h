@@ -323,8 +323,8 @@ function u8    utf16_encode_codepoint(rune codepoint, u16 *s, ByteOrder bo);
 #endif
 
 #if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
-# define Likely(x)   __builtin_expect((x), 1)
-# define Unlikely(x) __builtin_expect((x), 0)
+# define Likely(x)   __builtin_expect((s64)(x), 1l)
+# define Unlikely(x) __builtin_expect((s64)(x), 0l)
 #else
 // TODO(rutgerbrf): find out if other compilers support these kind of things too
 # define Likely(x)   x

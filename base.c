@@ -14,12 +14,12 @@
 # include <immintrin.h>
 function u64
 swap_byte_order_u64(u64 x) {
-  return _bswap64(x);
+  return (u64)_bswap64((s64)x);
 }
 
 function u32
 swap_byte_order_u32(u32 x) {
-  return _bswap(x);
+  return (u32)_bswap((s32)x);
 }
 
 function u16
@@ -55,7 +55,9 @@ swap_byte_order_u32(u32 x) {
 #if !NATIVE_SWAP_16
 function u16
 swap_byte_order_u16(u16 x) {
-  return ((x >> 8) & 0x00FF) | ((x << 8) & 0xFF00);
+  u16 high = (u16)(x >> 8) & (u16)0x00FF;
+  u16 low  = (u16)(x << 8) & (u16)0xFF00;
+  return high | low;
 }
 #endif
 
@@ -84,15 +86,19 @@ mem_release(Mem_Base *mb, void *p, usize size) {
 }
 
 function void
-mem_noop_mem_change(void *ctx, void *p, usize size) {}
+mem_noop_mem_change(void *ctx_, void *p_, usize size_) {
+  (void)ctx_; (void)p_; (void)size_;
+}
 
 function void *
 mem_malloc_reserve(void *ctx_, usize size) {
+  (void)ctx_;
   return malloc(size);
 }
 
 function void
 mem_malloc_release(void *ctx_, void *p, usize size_) {
+  (void)ctx_; (void)size_;
   free(p);
 }
 
@@ -111,6 +117,26 @@ mem_malloc_base() {
 function void
 mem_auto_change(Mem_AutoChangeContext *ctx) {
   if (ctx->pp != NULL) ctx->call(ctx->mb, *ctx->pp, ctx->size);
+}
+
+function usize
+ststring_length(const char *str, char sentinel) {
+  const char *end;
+  __asm__("movq %1, %%rdi\n\t"
+          "movb %2, %%al\n\t"
+          "movq $-1, %%rcx\n\t"
+          "cld\n\t"
+          "repne scasb\n\t"
+          "movq %%rdi, %0"
+          : "=r" (end)
+          : "r" (str), "r" (sentinel)
+          : "rcx", "rdi", "al");
+  // end ends up being the memory location of the byte
+  // after the last byte of str. We want the memory location
+  // of the last byte of the string, so we decrement it by one.
+  end--;
+  Assert(*end == sentinel);
+  return end - str;
 }
 
 function String
@@ -142,26 +168,6 @@ string_to_c(Mem_Base *mb, String s) {
 function String
 string_from_raw(const u8 *buf, usize len) {
   return (String){ .buf = buf, .len = len };
-}
-
-function usize
-ststring_length(const char *str, char sentinel) {
-  const char *end;
-  __asm__("movq %1, %%rdi\n\t"
-          "movb %2, %%al\n\t"
-          "movq $-1, %%rcx\n\t"
-          "cld\n\t"
-          "repne scasb\n\t"
-          "movq %%rdi, %0"
-          : "=r" (end)
-          : "r" (str), "r" (sentinel)
-          : "rcx", "rdi", "al");
-  // end ends up being the memory location of the byte
-  // after the last byte of str. We want the memory location
-  // of the last byte of the string, so we decrement it by one.
-  end--;
-  Assert(*end == sentinel);
-  return end - str;
 }
 
 function usize

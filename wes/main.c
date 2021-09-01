@@ -83,11 +83,14 @@ typedef struct Wes_Type {
   struct Wes_Type *next;
 } Wes_Type;
 
-global const Wes_Type primitive_types[Wes_PrimitiveType_COUNT] = {
-#define X(type) [Glue(Wes_PrimitiveType_, type)] = { .name = Str(Stringify(type)), .value.primitive = Glue(Wes_PrimitiveType_, type), .kind = Wes_TypeKind_Primitive, .next = NULL },
-  XM_WES_PRIMITIVE_TYPES
+global Wes_Type primitive_types[Wes_PrimitiveType_COUNT];
+
+function void
+wes_init_primitive_types() {
+#define X(type) primitive_types[Glue(Wes_PrimitiveType_, type)] = (Wes_Type){ .name = Str(Stringify(type)), .value.primitive = Glue(Wes_PrimitiveType_, type), .kind = Wes_TypeKind_Primitive, .next = NULL };
+    XM_WES_PRIMITIVE_TYPES
 #undef X
-};
+}
 
 typedef struct Wes_MessageField {
   String    name;
@@ -652,6 +655,7 @@ process_file(Mem_Base *mb, String filename) {
 
 s32
 main(s32 argc, char *argv[]) {
+  wes_init_primitive_types();
   Mem_Base *mb = mem_malloc_base();
 
   if (argc == 1) {
