@@ -64,7 +64,7 @@ run_rpc_server(RpcServer *srv) {
   }
 
   mbedtls_ssl_context ssl;
-reset:
+Reset:
   mbedtls_ssl_init(&ssl);
   s = mbedtls_ssl_setup(&ssl, &srv->conf);
   if (s != 0) {
@@ -91,7 +91,7 @@ reset:
   while ((s = mbedtls_ssl_handshake(&ssl)) != 0) {
     if (s != MBEDTLS_ERR_SSL_WANT_READ && s != MBEDTLS_ERR_SSL_WANT_WRITE) {
       perror("SSL handshake failed");
-      goto reset;
+      goto Reset;
     }
   }
 
@@ -128,22 +128,72 @@ reset:
   return 0;
 }
 
-function RpcResponse
-rpc_server_handle(RpcServer *srv, u64 uid, Slice(u8) data) {
+function void
+rpc_request_destroy(RpcRequest req) {
+  SliceDestroy(req.data);
+}
+
+function void
+rpc_server_respond(RpcServer *srv_, RpcResponse rsp_) {
+  (void)srv_; (void)rsp_;
+}
+
+function void
+rpc_server_handle(RpcServer *srv, RpcRequest req) {
   for (usize i = 0; i < SliceLen(srv->handlers); i++) {
     RpcHandler hdlr = srv->handlers.items[i];
-    if (hdlr.uid == uid) return hdlr.f(srv, data, hdlr.ctx);
+    if (hdlr.uid == req.uid) {
+      hdlr.f(srv, req, hdlr.ctx);
+      rpc_request_destroy(req);
+      return;
+    }
   }
-  return (RpcResponse){
+  RpcResponse rsp = {
     .code = 5, /* not found */
     .data = SliceNew(u8, srv->mb),
+    .client_id  = req.client_id,
+    .request_id = req.request_id,
   };
+  rpc_server_respond(srv, rsp);
+}
+
+function s32
+try_read_vu64(Slice(u8) bs) {
+  u64 x = 0;
+  bool ended = false;
+  for (usize i = 0; i < bs.len; i++) {
+    u8 b = bs.items[i];
+    ended = b & 0x80;
+    x = (u64)(x << 7) | (u64)(b & ~0x80);
+    if (ended) break;
+  }
+  if (!ended) return -1; // need more data
+}
+
+function void
+rpc_client_read(RpcClient *c, Slice(u8) data) {
+  SliceExtend(&c->rbuf, data);
+  switch (c->rstate) {
+  case RpcClientReadState_Start:
+    if (SliceLen(c->rbuf) < 3) {
+      // Not a valid request or response
+      return;
+    }
+  case RpcClientReadState_Body: break;
+  default: break;
+  }
 }
 
 function void
 rpc_server_reg_handler(RpcServer *srv, RpcHandler hdl) {
   SliceAppend(&srv->handlers, hdl);
-  rpc_server_handle(srv, 1293408, (Slice(u8)){0});
+  RpcRequest req = {
+    .uid  = 1293408,
+    .data = SliceNew(u8, srv->mb),
+    .client_id  = 0,
+    .request_id = 0,
+  };
+  rpc_server_handle(srv, req);
 }
 
 function RpcHandler
@@ -151,15 +201,52 @@ rpc_handler_new(u64 uid, RpcHandlerFunc *f, void *ctx) {
   return (RpcHandler){ .uid = uid, .f = f, .ctx = ctx };
 }
 
+function usize
+slice_next_cap(usize want_len) {
+  if (Unlikely(want_len == 0))
+    return 0;
+#if IsCompiler(COMPILER_GCC) || IsCompiler(COMPILER_CLANG)
+  // This if statement should be evaluated at compile-time.
+  if (sizeof(usize) == 8) {
+    s32 leading_zeros = __builtin_clzll((u64)want_len);
+    if (Unlikely(leading_zeros == 0))
+      return USIZE_MAX;
+    return (usize)1 << (63 - leading_zeros);
+  } else if (sizeof(usize) == 4) {
+    s32 leading_zeros = __builtin_clz((u32)want_len);
+    if (Unlikely(leading_zeros == 0))
+      return USIZE_MAX;
+    return (usize)1 << (31 - leading_zeros);
+  }
+#else
+  usize cap = 1;
+  while (cap < want_len && cap < (USIZE_MAX / 2))
+    cap *= 2;
+  if (cap < want_len)
+    cap = USIZE_MAX;
+  return cap;
+#endif
+}
+
 function void
-slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usize item_size) {
-  void *new_items = mem_reserve(mb, item_size * *cap * 2);
-  mem_commit(mb, new_items, item_size * *cap * 2);
+slice_grow_for(usize new_len, usize *len, usize *cap, Mem_Base *mb, void **items, usize item_size) {
+  usize new_cap = slice_next_cap(new_len);
+  void *new_items = mem_reserve(mb, item_size * new_cap);
+  mem_commit(mb, new_items, item_size * new_cap);
   memmove(new_items, *items, item_size * *len);
   if (*items != NULL) {
-    mem_decommit(mb, *items, item_size * *cap);
-    mem_release(mb, *items, item_size * *cap);
+    mem_decommit_release(mb, *items, item_size * *cap);
   }
   *items = new_items;
-  *cap *= 2;
+  *cap *= new_cap;
+}
+
+function void
+slice_grow(usize *len, usize *cap, Mem_Base *mb, void **items, usize item_size) {
+  slice_grow_for(*len + 1, len, cap, mb, items, item_size);
+}
+
+function void
+slice_destroy(usize cap, Mem_Base *mb, void *items, usize item_size) {
+  mem_decommit_release(mb, items, cap * item_size);
 }

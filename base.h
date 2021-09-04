@@ -19,6 +19,8 @@
 #define ClampTop(x, max) Min(x, max)
 #define ClampBot(x, min) Max(x, min)
 
+#define StaticAssert(expression, message) _Static_assert(expression, message)
+
 #define global   static
 #define local    static
 #define function static
@@ -200,6 +202,8 @@ function void *mem_reserve(Mem_Base *mb, usize size);
 function void  mem_commit(Mem_Base *mb, void *p, usize size);
 function void  mem_decommit(Mem_Base *mb, void *p, usize size);
 function void  mem_release(Mem_Base *mb, void *p, usize size);
+function void *mem_reserve_commit(Mem_Base *mb, usize size);
+function void  mem_decommit_release(Mem_Base *mb, void *p, usize size);
 
 function void  mem_noop_mem_change(void *ctx, void *p, usize size);
 
@@ -296,7 +300,7 @@ function String string_slice(String s, usize start_at, usize len);
 
 typedef struct {
   ByteOrder  bo;
-  u16       *buf;
+  const u16 *buf;
   usize      len;
 } Utf16String;
 

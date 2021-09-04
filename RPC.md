@@ -32,6 +32,10 @@ response Identity_CreateUserResponse {
 Identity_CreateUserResponse identity_create_user(Identity_CreateUserRequest) @0x94BE_0166_BBED_2DE0;
 ```
 
+## Statuses
+
+0xFF is reserved.
+
 ## Protocol
 
 Functions with TLS-over-TCP.
@@ -48,10 +52,10 @@ response VoidResponse {
 Built-in procedure IDs:
 - 0: `VoidResponse ping(Void) @0x00`
 
-TODO(rutgerbrf): this won't work, determine an efficient way to discern requests and responses.
+Request: `FF <procedure ID, u64> <response ID, vu64, 00 if not applicable> <payload length, vu64> <payload, bytes>`  
+Response: `<status, u8> <response ID, vu64, never 00> <payload length, vu64> <response family ID> <payload, bytes>`
 
-Request: `<procedure ID, vu64> <response ID, vu64, 00 if not applicable> <payload, bytes, 00 for no/empty payload>`  
-Response: `1<status> <response ID, vu64, never 00> <response family ID, vu64> <payload, bytes, 00 for no/empty payload>`
+TODO(rutgerbrf): explain response family ID structure
 
 ```
 Client -> server: identity_create_user({ user = { name = "Hello" } })

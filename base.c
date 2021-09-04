@@ -85,6 +85,19 @@ mem_release(Mem_Base *mb, void *p, usize size) {
   mb->release(mb->ctx, p, size);
 }
 
+function void *
+mem_reserve_commit(Mem_Base *mb, usize size) {
+  void *p = mb->reserve(mb->ctx, size);
+  mem_commit(mb, p, size);
+  return p;
+}
+
+function void
+mem_decommit_release(Mem_Base *mb, void *p, usize size) {
+  mem_decommit(mb, p, size);
+  mem_release(mb, p, size);
+}
+
 function void
 mem_noop_mem_change(void *ctx_, void *p_, usize size_) {
   (void)ctx_; (void)p_; (void)size_;
@@ -393,14 +406,16 @@ utf16_to_utf8(Mem_Base *mb, Utf16String s) {
 
 function void
 string_destroy(Mem_Base *mb, String s) {
-  // TODO(rutgerbrf): what if the user would prefer using mem_decommit?
-  mem_release(mb, (union { void *p; const u8 *buf; }){ .buf = s.buf }.p, s.len);
+  void *p = (union { void *p; const u8 *buf; }){ .buf = s.buf }.p;
+  mem_decommit(mb, p, s.len);
+  mem_release(mb, p, s.len);
 }
 
 function void
 utf16string_destroy(Mem_Base *mb, Utf16String s) {
-  // TODO(rutgerbrf): what if the user would prefer using mem_decommit?
-  mem_release(mb, s.buf, s.len * sizeof(u16));
+  void *p = (union { void *p; const u16 *buf; }){ .buf = s.buf }.p;
+  mem_decommit(mb, (u8 *)p, s.len * sizeof(u16));
+  mem_release(mb, (u8 *)p, s.len * sizeof(u16));
 }
 
 function String

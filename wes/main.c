@@ -144,7 +144,7 @@ typedef struct {
 function void
 wes_message_push_field(CompileState *cs, Wes_Type *t, Wes_MessageField f) {
   if (t->kind != Wes_TypeKind_Message) return;
-  Wes_MessageField *heapf = mem_reserve(cs->mb, sizeof(Wes_MessageField));
+  Wes_MessageField *heapf = mem_reserve_commit(cs->mb, sizeof(Wes_MessageField));
   *heapf = f;
   heapf->next = t->value.message;
   t->value.message = heapf;
@@ -153,7 +153,7 @@ wes_message_push_field(CompileState *cs, Wes_Type *t, Wes_MessageField f) {
 function void
 wes_response_push_field(CompileState *cs, Wes_Type *t, Wes_ResponseField f) {
   if (t->kind != Wes_TypeKind_Response) return;
-  Wes_ResponseField *heapf = mem_reserve(cs->mb, sizeof(Wes_ResponseField));
+  Wes_ResponseField *heapf = mem_reserve_commit(cs->mb, sizeof(Wes_ResponseField));
   *heapf = f;
   heapf->next = t->value.response;
   t->value.response = heapf;
@@ -161,7 +161,7 @@ wes_response_push_field(CompileState *cs, Wes_Type *t, Wes_ResponseField f) {
 
 function void
 cs_push_type(CompileState *cs, Wes_Type t) {
-  Wes_Type *heapt = mem_reserve(cs->mb, sizeof(Wes_Type));
+  Wes_Type *heapt = mem_reserve_commit(cs->mb, sizeof(Wes_Type));
   *heapt = t;
   heapt->next = cs->types;
   cs->types = heapt;
@@ -169,7 +169,7 @@ cs_push_type(CompileState *cs, Wes_Type t) {
 
 function void
 cs_push_rpc(CompileState *cs, Wes_Rpc c) {
-  Wes_Rpc *heapc = mem_reserve(cs->mb, sizeof(Wes_Rpc));
+  Wes_Rpc *heapc = mem_reserve_commit(cs->mb, sizeof(Wes_Rpc));
   *heapc = c;
   heapc->next = cs->rpcs;
   cs->rpcs = heapc;
@@ -554,7 +554,7 @@ wes_destroy_message_fields(CompileState *cs, Wes_MessageField *fields) {
   Wes_MessageField *field = fields;
   while (field) {
     Wes_MessageField *next = field->next;
-    mem_release(cs->mb, field, sizeof(Wes_ResponseField));
+    mem_decommit_release(cs->mb, field, sizeof(Wes_ResponseField));
     field = next;
   }
 }
@@ -564,7 +564,7 @@ wes_destroy_response_fields(CompileState *cs, Wes_ResponseField *fields) {
   Wes_ResponseField *field = fields;
   while (field) {
     Wes_ResponseField *next = field->next;
-    mem_release(cs->mb, field, sizeof(Wes_ResponseField));
+    mem_decommit_release(cs->mb, field, sizeof(Wes_ResponseField));
     field = next;
   }
 }
@@ -596,7 +596,7 @@ cs_destroy(CompileState *cs) {
   while (t) {
     Wes_Type *next = t->next;
     wes_type_destroy(cs, t);
-    mem_release(cs->mb, t, sizeof(Wes_Type));
+    mem_decommit_release(cs->mb, t, sizeof(Wes_Type));
     t = next;
   }
 
@@ -604,7 +604,7 @@ cs_destroy(CompileState *cs) {
   while (c) {
     Wes_Rpc *next = c->next;
     wes_rpc_destroy(cs, c);
-    mem_release(cs->mb, c, sizeof(Wes_Rpc));
+    mem_decommit_release(cs->mb, c, sizeof(Wes_Rpc));
     c = next;
   }
 }
