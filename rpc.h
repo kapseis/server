@@ -36,7 +36,7 @@ function void  slice_destroy(usize cap, Mem_Base *mb, void *items, usize item_si
 #define SliceNew(t, membase) (Slice(t)){ .len = 0, .cap = 0, .mb = (membase), .items = NULL }
 #define SliceNewWithCap(t, membase, cap) (Slice(t)){ .len = 0, .cap = (cap), .mb = (membase), .items = mem_reserve_commit((membase), cap * sizeof(t)) }
 #define SliceDestroy(s) slice_destroy((s).cap, (s).mb, (s).items, sizeof(*(s).items))
-#define $(s, i) (((i) >= (s).len) ? ((s).items = Unreachable("index out of bounds")) : &(s).items[i])
+#define $(s, i) ((s).items[((i) >= (s).len) ? (*(usize *)Unreachable("index out of bounds")) : (i)])
 #define SliceAppend(sp, v) do {                                                                  \
     if ((sp)->len + 1 > (sp)->cap)                                                               \
       slice_grow(&(sp)->len, &(sp)->cap, (sp)->mb, (void **)&(sp)->items, sizeof(*(sp)->items)); \

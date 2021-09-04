@@ -162,7 +162,7 @@ try_read_vu64(Slice(u8) bs) {
   u64 x = 0;
   bool ended = false;
   for (usize i = 0; i < bs.len; i++) {
-    u8 b = bs.items[i];
+    u8 b = $(bs, i);
     ended = b & 0x80;
     x = (u64)(x << 7) | (u64)(b & ~0x80);
     if (ended) break;
