@@ -42,11 +42,12 @@ function void  slice_destroy(usize cap, Mem_Base *mb, void *items, usize item_si
       slice_grow(&(sp)->len, &(sp)->cap, (sp)->mb, (void **)&(sp)->items, sizeof(*(sp)->items)); \
     (sp)->items[(sp)->len++] = v;                                                                \
   } while (false)
-#define SliceExtend(sp, s) do { \
-    StaticAssert(sizeof(*(sp)->items) == sizeof(*(s).items), "SliceExtend must be provided with two slices, with items of equal size"); \
-    if ((sp)->len + (s).len > (sp)->cap) \
-      slice_grow_for((sp)->len + (s).len, &(sp)->len, &(sp)->cap, (sp)->mb, (void **)&(sp)->items, sizeof(*(sp)->items)); \
-    memmove(&(sp)->items[(sp)->len], (s).items, sizeof(*(sp)->items) * (sp)->cap); \
+#define SliceExtend(sp, s) do {                                                                                                         \
+    if ((s).len == 0) return;                                                                                                           \
+    if ((sp)->len + (s).len > (sp)->cap)                                                                                                \
+      slice_grow_for((sp)->len + (s).len, &(sp)->len, &(sp)->cap, (sp)->mb, (void **)&(sp)->items, sizeof(*(sp)->items));               \
+    (sp)->items[(sp)->len] = (s).items[0]; /* make sure the types are equal */                                                          \
+    memmove(&(sp)->items[(sp)->len + 1], (s).items, sizeof(*(s).items) * (s).len);                                                      \
   } while (false)
 #define SliceLen(s) (s).len
 
